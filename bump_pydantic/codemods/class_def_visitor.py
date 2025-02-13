@@ -33,7 +33,12 @@ class ClassDefVisitor(VisitorBasedCodemodCommand):
 
         self.context.scratch.setdefault(
             self.BASE_MODEL_CONTEXT_KEY,
-            {"pydantic.BaseModel", "pydantic.main.BaseModel"},
+            {
+                "pydantic.BaseModel", "pydantic.main.BaseModel",
+                #TODO: find a better way to do this mapping
+                "libutil.util.NoonBaseModel", "libutil.NoonBaseModel",
+                "libutil.util.CamelCaseBaseModel", "libutil.CamelCaseBaseModel",
+            },
         )
         self.context.scratch.setdefault(self.NO_BASE_MODEL_CONTEXT_KEY, set())
         self.context.scratch.setdefault(self.CLS_CONTEXT_KEY, defaultdict(set))
