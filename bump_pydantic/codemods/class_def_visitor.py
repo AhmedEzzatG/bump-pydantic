@@ -47,7 +47,13 @@ class ClassDefVisitor(VisitorBasedCodemodCommand):
         if classname in context_set and classname in self.context.scratch[self.CLS_CONTEXT_KEY]:
             for child_classname in self.context.scratch[self.CLS_CONTEXT_KEY].pop(classname):
                 context_set.add(child_classname)
+                context_set.add(f"...src.{child_classname}")
+
                 self._recursively_disambiguate(child_classname, context_set)
+
+    def get_classname(self, fqn: QualifiedName):
+        return fqn.name.replace("...src.", "")
+
 
     def visit_ClassDef(self, node: cst.ClassDef) -> None:
         fqn_set = self.get_metadata(FullyQualifiedNameProvider, node)
@@ -56,19 +62,25 @@ class ClassDefVisitor(VisitorBasedCodemodCommand):
             return None
 
         fqn: QualifiedName = next(iter(fqn_set))  # type: ignore
+        classname = self.get_classname(fqn)
 
         if not node.bases:
-            self.context.scratch[self.NO_BASE_MODEL_CONTEXT_KEY].add(fqn.name)
+            self.context.scratch[self.NO_BASE_MODEL_CONTEXT_KEY].add(classname)
 
         for arg in node.bases:
             base_fqn_set = self.get_metadata(FullyQualifiedNameProvider, arg.value)
             base_fqn_set = base_fqn_set or set()
 
             for base_fqn in cast(Set[QualifiedName], iter(base_fqn_set)):  # type: ignore
-                if base_fqn.name in self.context.scratch[self.BASE_MODEL_CONTEXT_KEY]:
-                    self.context.scratch[self.BASE_MODEL_CONTEXT_KEY].add(fqn.name)
-                elif base_fqn.name in self.context.scratch[self.NO_BASE_MODEL_CONTEXT_KEY]:
-                    self.context.scratch[self.NO_BASE_MODEL_CONTEXT_KEY].add(fqn.name)
+                base_classname = self.get_classname(base_fqn)
+
+                if base_classname in self.context.scratch[self.BASE_MODEL_CONTEXT_KEY]:
+                    self.context.scratch[self.BASE_MODEL_CONTEXT_KEY].add(classname)
+                    self.context.scratch[self.BASE_MODEL_CONTEXT_KEY].add(f"...src.{classname}")
+                elif base_classname in self.context.scratch[self.NO_BASE_MODEL_CONTEXT_KEY]:
+                    self.context.scratch[self.NO_BASE_MODEL_CONTEXT_KEY].add(classname)
+                    self.context.scratch[self.NO_BASE_MODEL_CONTEXT_KEY].add(f"...src.{classname}")
+
 
             # In case we have the following scenario:
             # class ChildA(A):
@@ -78,7 +90,7 @@ class ClassDefVisitor(VisitorBasedCodemodCommand):
             # class C: ...
             # We want to disambiguate `A` and then `ChildA` as soon as we see `B` is a `BaseModel`.
             # We recursively add child classes to self.BASE_MODEL_CONTEXT_KEY.
-            self._recursively_disambiguate(fqn.name, self.context.scratch[self.BASE_MODEL_CONTEXT_KEY])
+            self._recursively_disambiguate(classname, self.context.scratch[self.BASE_MODEL_CONTEXT_KEY])
 
             # In case we have the following scenario:
             # class A(B): ...
@@ -88,19 +100,19 @@ class ClassDefVisitor(VisitorBasedCodemodCommand):
             # class C: ...
             # We want to disambiguate `D` and then `E` as soon as we see `C` is NOT a `BaseModel`.
             # We recursively add child classes to self.NO_BASE_MODEL_CONTEXT_KEY.
-            self._recursively_disambiguate(fqn.name, self.context.scratch[self.NO_BASE_MODEL_CONTEXT_KEY])
+            self._recursively_disambiguate(classname, self.context.scratch[self.NO_BASE_MODEL_CONTEXT_KEY])
 
             # In case we have the following scenario:
             # class A(B): ...
             # ...And B is not known.
             # We want to make sure that B -> A is added to the `cls` context, so if we find B later,
             # we can disambiguate.
-            if fqn.name not in (
+            if classname not in (
                 *self.context.scratch[self.BASE_MODEL_CONTEXT_KEY],
                 *self.context.scratch[self.NO_BASE_MODEL_CONTEXT_KEY],
             ):
                 for base_fqn in cast(Set[QualifiedName], base_fqn_set):
-                    self.context.scratch[self.CLS_CONTEXT_KEY][base_fqn.name].add(fqn.name)
+                    self.context.scratch[self.CLS_CONTEXT_KEY][self.get_classname(base_fqn)].add(classname)
 
     # TODO: Implement this if needed...
     def next_file(self, visited: set[str]) -> str | None:

@@ -122,6 +122,14 @@ def main(
             if next_file is not None:
                 queue.appendleft(next_file)
 
+
+    with open("log.txt", "a+") as log:
+        log.writelines("\n".join(scratch[ClassDefVisitor.CLS_CONTEXT_KEY]))
+        log.writelines("\n\n\n")
+        log.writelines("\n".join(scratch[ClassDefVisitor.NO_BASE_MODEL_CONTEXT_KEY]))
+        log.writelines("\n\n\n")
+        log.writelines("\n".join(scratch[ClassDefVisitor.BASE_MODEL_CONTEXT_KEY]))
+
     start_time = time.time()
 
     codemods = gather_codemods(disabled=disable)
