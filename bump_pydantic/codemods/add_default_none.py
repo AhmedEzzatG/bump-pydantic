@@ -77,38 +77,6 @@ class AddDefaultNoneCommand(VisitorBasedCodemodCommand):
             self.should_add_none = True
         return None
 
-    def _handle_leave_AnnAssign_add_deafult_none(self, original_node: cst.AnnAssign, updated_node: cst.AnnAssign) -> cst.AnnAssign:
-        if not self.inside_base_model:
-            return updated_node
-
-        if not self.should_add_none:
-            return updated_node
-
-        if updated_node.value is None:
-            updated_node = updated_node.with_changes(value=cst.Name("None"))
-
-        elif m.matches(updated_node.value, m.Call(func=m.Name("Field"))):
-            assert isinstance(updated_node.value, cst.Call)
-            args = updated_node.value.args
-            if args:
-                # NOTE: It has a "default" value as positional argument. Nothing to do.
-                if args[0].keyword is None:
-                    ...
-                # NOTE: It has a "default" or "default_factory" keyword argument. Nothing to do.
-                elif any(arg.keyword and arg.keyword.value in ("default", "default_factory") for arg in args):
-                    ...
-                else:
-                    updated_node = updated_node.with_changes(
-                        value=updated_node.value.with_changes(args=[cst.Arg(value=cst.Name("None")), *args])
-                    )
-
-            # NOTE: This is the case where `Field` is called without any arguments e.g. `Field()`.
-            else:
-                updated_node = updated_node.with_changes(
-                    value=updated_node.value.with_changes(args=[cst.Arg(value=cst.Name("None"))])  # type: ignore
-                )
-        return updated_node
-
     # add optional if the assignment has a default value
     def _handle_leave_AnnAssign_add_optional_for_default(self, original_node: cst.AnnAssign, updated_node: cst.AnnAssign) -> cst.AnnAssign:
         if not self.inside_base_model or self.should_add_none:
