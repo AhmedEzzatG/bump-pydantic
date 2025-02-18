@@ -94,11 +94,9 @@ class AddDefaultNoneCommand(VisitorBasedCodemodCommand):
             args = updated_node.value.args
 
             if args:
-                # NOTE: It has a "default" value as positional argument. Nothing to do.
                 if args[0].keyword is None:
                     updated_node = updated_node.with_changes(
                         annotation=updated_node.annotation.with_changes(annotation=new_annotation))
-                # NOTE: It has a "default" or "default_factory" keyword argument. Nothing to do.
                 elif any(arg.keyword and arg.keyword.value in ("default", "default_factory") for arg in args):
                     updated_node = updated_node.with_changes(
                         annotation=updated_node.annotation.with_changes(annotation=new_annotation))
